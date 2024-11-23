@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([pcifuzzer], [0.0.0], [BUG-REPORT-ADDRESS])
+AC_INIT([pcifuzzer], [0.0.1], [BUG-REPORT-ADDRESS])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign])
 AC_CONFIG_SRCDIR([lib/error.h])
 AC_CONFIG_HEADERS([config.h])
