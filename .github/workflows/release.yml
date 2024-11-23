@@ -1,0 +1,136 @@
+name: build
+
+on:
+  push:
+    branches: main
+
+  workflow_dispatch:
+    inputs:
+      version_increment:
+        description: 'Version to increment'
+        required: true
+        default: 'patch'
+        options:
+          - major
+          - minor
+          - patch
+
+jobs:
+  build:
+    name: Build and publish
+
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+      pages: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Autotools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq autoconf automake libtool
+
+      - name: Instantiate the build system
+        run: autoreconf -fi
+
+      - name: Build
+        run: |
+          mkdir build/
+          cd build/
+          ../configure
+          make
+          make DESTDIR=$(pwd)/dist install
+          cd ../
+          rm -fr build/
+
+      - name: Run tests
+        run: |
+          # TODO:
+          # make check
+          # make distcheck
+
+      - name: Update version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version_increment="${{ github.event.inputs.version_increment }}"
+          version_increment="${version_increment:-patch}"
+
+          if [[ "$version_increment" == "patch" ]]; then
+            commit_message=$(git log -1 --pretty=%B)
+            if [[ "$commit_message" =~ Version-increment:\ (major|minor|patch) ]]; then
+              version_increment="${BASH_REMATCH[1]}"
+            fi
+          fi
+
+          version=$(grep -Eo '\[[0-9]+\.[0-9]+\.[0-9]+\]' configure.ac | tr -d '[]')
+          major=$(echo "$version" | cut -d. -f1)
+          minor=$(echo "$version" | cut -d. -f2)
+          patch=$(echo "$version" | cut -d. -f3)
+
+          case $version_increment in
+            major)
+              new_major=$((major + 1))
+              new_minor=0
+              new_patch=0
+              ;;
+            minor)
+              new_major=$((major))
+              new_minor=$((minor + 1))
+              new_patch=0
+              ;;
+            patch)
+              new_major=$((major))
+              new_minor=$((minor))
+              new_patch=$((patch + 1))
+              ;;
+          esac
+
+          new_version="${new_major}.${new_minor}.${new_patch}"
+          sed -i -E "s/(AC_INIT\(\[[^]]+\], \[)[0-9]+\.[0-9]+\.[0-9]+/\1${new_version}/" configure.ac
+
+          echo "version=$major.$minor.$patch" >> $GITHUB_ENV
+          echo "new_version=$new_major.$new_minor.$new_patch" >> $GITHUB_ENV
+
+          git config --global user.email "rcvalle@users.noreply.github.com"
+          git config --global user.name "Ramon de C Valle"
+          git add configure.ac
+          git commit -m "Update version to $new_major.$new_minor.$new_patch"
+          git push origin main
+
+      - name: Create packages
+        run: |
+          if [[ ! -f build-aux/config.guess ]]; then
+            mkdir build-aux
+            wget -qO build-aux/config.guess http://git.savannah.gnu.org/cgit/config.git/plain/config.guess
+            chmod +x build-aux/config.guess
+          fi
+          host_triple=$(build-aux/config.guess)
+          project_name=$(grep -Eo 'AC_INIT\(\[[^]]+\]' configure.ac | sed -E 's/AC_INIT\(\[([^]]+)\]/\1/')
+          package_name="${project_name}-${{ env.new_version }}-${host_triple}"
+          mkdir build/
+          cd build/
+          ../configure
+          make
+          make DESTDIR=$(pwd)/$package_name install
+          tar -czvf ${package_name}.tar.gz $package_name
+          zip -r ${package_name}.zip $package_name
+
+      - name: Create new release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          changelog=$(mktemp)
+          if [[ "${{ env.version }}" != "0.0.0" ]]; then
+            git fetch --all -t
+            git log "v${{ env.version }}"..HEAD --pretty='format:* %s' > "$changelog"
+          else
+            git log --pretty='format:* %s' > "$changelog"
+          fi
+          gh release create "v${{ env.new_version }}" -F "$changelog" -t "v${{ env.new_version }}" build/*.tar.gz build/*.zip
+          rm "$changelog"

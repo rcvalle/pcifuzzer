@@ -1,0 +1,34 @@
+name: build
+
+on:
+  push:
+    branches: main
+  pull_request:
+    branches: main
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Autotools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -qq autoconf automake libtool
+
+      - name: Instantiate the build system
+        run: autoreconf -fi
+
+      - name: Build
+        run: |
+          ./configure
+          make
+
+      - name: Run tests
+        run: |
+          # TODO:
+          # make check
+          # make distcheck

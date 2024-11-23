@@ -1,0 +1,25 @@
+---
+Language: Cpp
+BasedOnStyle: GNU
+AlignAfterOpenBracket: DontAlign
+AlignEscapedNewlines: DontAlign
+AllowAllArgumentsOnNextLine: false
+AllowAllConstructorInitializersOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortEnumsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+BreakBeforeBraces: Linux
+ColumnLimit: 120
+ConstructorInitializerIndentWidth: 8
+ContinuationIndentWidth: 8
+Cpp11BracedListStyle: true
+FixNamespaceComments: true
+IndentWidth: 4
+KeepEmptyLinesAtTheStartOfBlocks: false
+SpaceBeforeParens: ControlStatements
+StatementMacros:
+  - _input_define
+  - _io_define
+  - _pci_config_define
+  - _pci_device_region_define
+  - _string_split_range_define
